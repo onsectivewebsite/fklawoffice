@@ -1,3 +1,7 @@
+// Mark html as JS-ready immediately so CSS can safely activate reveal animations.
+// Without this, .reveal / .stagger initial states stay hidden if JS fails to run.
+document.documentElement.classList.add('js-ready');
+
 document.addEventListener('DOMContentLoaded', () => {
   const toggle = document.querySelector('.menu-toggle');
   const links = document.querySelector('.nav-links');
@@ -22,8 +26,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
 
-  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-zoom').forEach(el => observer.observe(el));
 
+  // Animate numeric stats up from 0 once visible
+  const countObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      const target = parseFloat(el.dataset.target);
+      const suffix = el.dataset.suffix || '';
+      const prefix = el.dataset.prefix || '';
+      const isInt = Number.isInteger(target);
+      const duration = 1400;
+      const start = performance.now();
+
+      const step = (now) => {
+        const t = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const val = target * eased;
+        el.textContent = prefix + (isInt ? Math.round(val) : val.toFixed(1)) + suffix;
+        if (t < 1) requestAnimationFrame(step);
+        else el.textContent = prefix + (isInt ? target : target.toFixed(1)) + suffix;
+      };
+      requestAnimationFrame(step);
+      countObserver.unobserve(el);
+    });
+  }, { threshold: 0.4 });
+
+  document.querySelectorAll('[data-target]').forEach(el => {
+    el.textContent = (el.dataset.prefix || '') + '0' + (el.dataset.suffix || '');
+    countObserver.observe(el);
+  });
+
+  // Duplicate marquee content for seamless looping
+  document.querySelectorAll('.marquee-track').forEach(track => {
+    track.innerHTML += track.innerHTML;
+  });
+
+  // Contact form -> mailto
   const form = document.getElementById('contact-form');
   if (form) {
     form.addEventListener('submit', (e) => {
